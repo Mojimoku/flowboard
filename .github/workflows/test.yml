@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results
+
+  # Runs only when a dedicated Supabase TEST project is configured in repo secrets.
+  rls:
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_TESTS_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:rls
+        env:
+          RLS_TEST_URL: ${{ secrets.RLS_TEST_URL }}
+          RLS_TEST_KEY: ${{ secrets.RLS_TEST_KEY }}
+          RLS_TEST_EMAIL_A: ${{ secrets.RLS_TEST_EMAIL_A }}
+          RLS_TEST_PASSWORD_A: ${{ secrets.RLS_TEST_PASSWORD_A }}
+          RLS_TEST_EMAIL_B: ${{ secrets.RLS_TEST_EMAIL_B }}
+          RLS_TEST_PASSWORD_B: ${{ secrets.RLS_TEST_PASSWORD_B }}
